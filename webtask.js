@@ -1,4 +1,9 @@
 const request = require('request-promise@1.0.2');
+const parse   = require('xml2js').parseString;
+const jsdom   = require('jsdom');
+
+const { JSDOM } = jsdom;
+
 
 /**
  * NotFoundError
@@ -11,21 +16,20 @@ const buildError = (text = 'test', color = 'danger', hasMarkDown = true) => ({
   mrkdwn_in: ['text'],
 });
 
-const buildSuccess = (text, poster, title, rating, link) => ({
-  text,
+const buildSuccess = (poster, title_and_rating, watched_on, link) => ({
   response_type: 'in_channel',
   attachments: [
     {
       thumb_url: poster,
       fields: [
         {
-          title: 'Title',
-          value: title,
+          title: 'Title/Rating',
+          value: title_and_rating,
           short: true,
         },
         {
-          title: 'Rating',
-          value: rating,
+          title: 'Reviewed On',
+          value: watched_on,
           short: true,
         },
         {
@@ -42,13 +46,33 @@ const buildSuccess = (text, poster, title, rating, link) => ({
 const getRecentMovie = (username) => {
   const url = `https://letterboxd.com/${username}/rss/`;
 
-  return request.get({ url, method: 'GET', dataType: "xml"})
+  request.get({ url, method: 'GET'})
     .then((response) => {
       if(!response) {
         throw new NotFoundError("No response...");
       }
 
-      console.log(response);
+      var title_and_rating;
+      var watched_on;
+      var link;
+      var poster;
+
+      parse(response, {},function(err, result) {
+        var previous_movie = result.rss.channel[0].item[0];
+
+        title_and_rating = previous_movie.title[0];
+        watched_on       = previous_movie.pubDate[0];
+        link             = previous_movie.link[0];
+        var poster_dom       = new JSDOM(previous_movie.description[0]);
+        poster           = poster_dom.window.document.querySelector('img').src;
+      });
+
+      return {
+        title_and_rating: title_and_rating,
+        watched_on: watched_on,
+        link: link,
+        poster: poster,
+      };
     });
 };
 
@@ -59,8 +83,10 @@ module.exports = (ctx, cb) => {
     return cb(null, buildError("Please provide a username"));
   }
 
-  cb(null, {
-    response_type: 'in_channel',
-    text: getRecentMovie(username),
-  });
+  return getRecentMovie(username)
+    .then(({title_and_rating, watched_on, link, poster}) => {
+      const response = buildSuccess(poster, title_and_rating, watched_on, link);
+      console.log(response);
+      cb(null, response);
+    })
 };
