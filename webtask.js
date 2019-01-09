@@ -15,7 +15,7 @@ const buildError = (text = 'test', color = 'danger', hasMarkDown = true) => ({
   mrkdwn_in: ['text'],
 });
 
-const buildSuccess = (username, poster, title_and_rating, watched_on, link) => ({
+const buildSuccess = (username, poster, title_and_rating, watched_on, link, review) => ({
   text: `*${username}* recently watched:`,
   response_type: 'in_channel',
   attachments: [
@@ -31,6 +31,12 @@ const buildSuccess = (username, poster, title_and_rating, watched_on, link) => (
         {
           title: 'Reviewed On',
           value: watched_on,
+          short: true,
+        },
+
+        {
+          title: 'Review',
+          value: review,
           short: true,
         },
 
@@ -60,13 +66,14 @@ const getRecentMovie = (username) => {
           const previous_movie = result.rss.channel[0].item[0];
           const poster_dom     = new JSDOM(previous_movie.description[0]);
 
-          const regex = '/(\w{3},\s\d{1,2}\s\w{3}\s\d{4})/gm';
+          const regex = /(\w{3},\s\d{1,2}\s\w{3}\s\d{4})/;
 
           resolve({
             title_and_rating : previous_movie.title[0],
             watched_on       : previous_movie.pubDate[0].match(regex)[0],
             link             : previous_movie.link[0],
             poster           : poster_dom.window.document.querySelector('img').src,
+            review           : poster_dom.window.document.querySelectorAll('p')['1'].textContent,
           });
         });
       });
@@ -81,9 +88,8 @@ module.exports = (ctx, cb) => {
   }
 
   return getRecentMovie(username)
-    .then(({ title_and_rating, watched_on, link, poster }) => {
-      const response = buildSuccess(username, poster, title_and_rating, watched_on, link);
-      console.log(response);
+    .then(({ title_and_rating, watched_on, link, poster, review }) => {
+      const response = buildSuccess(username, poster, title_and_rating, watched_on, link, review);
       cb(null, response);
     });
 };
