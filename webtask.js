@@ -1,6 +1,6 @@
 const request = require('request-promise@1.0.2');
-const parse = require('xml2js').parseString;
-const jsdom = require('jsdom');
+const parse   = require('xml2js').parseString;
+const jsdom   = require('jsdom');
 
 const { JSDOM } = jsdom;
 
@@ -58,13 +58,15 @@ const getRecentMovie = (username) => {
       return new Promise((resolve) => {
         parse(response, {}, (err, result) => {
           const previous_movie = result.rss.channel[0].item[0];
-          const poster_dom = new JSDOM(previous_movie.description[0]);
+          const poster_dom     = new JSDOM(previous_movie.description[0]);
+
+          const regex = '/(\w{3},\s\d{1,2}\s\w{3}\s\d{4})/gm';
 
           resolve({
-            title_and_rating: previous_movie.title[0],
-            watched_on: previous_movie.pubDate[0],
-            link: previous_movie.link[0],
-            poster: poster_dom.window.document.querySelector('img').src,
+            title_and_rating : previous_movie.title[0],
+            watched_on       : previous_movie.pubDate[0].match(regex)[0],
+            link             : previous_movie.link[0],
+            poster           : poster_dom.window.document.querySelector('img').src,
           });
         });
       });
