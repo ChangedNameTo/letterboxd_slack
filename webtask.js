@@ -1,14 +1,13 @@
 const request = require('request-promise@1.0.2');
-const parse   = require('xml2js').parseString;
-const jsdom   = require('jsdom');
+const parse = require('xml2js').parseString;
+const jsdom = require('jsdom');
 
 const { JSDOM } = jsdom;
-
 
 /**
  * NotFoundError
  */
-class NotFoundError extends Error {}
+class NotFoundError extends Error { }
 
 const buildError = (text = 'test', color = 'danger', hasMarkDown = true) => ({
   text,
@@ -16,7 +15,8 @@ const buildError = (text = 'test', color = 'danger', hasMarkDown = true) => ({
   mrkdwn_in: ['text'],
 });
 
-const buildSuccess = (poster, title_and_rating, watched_on, link) => ({
+const buildSuccess = (username, poster, title_and_rating, watched_on, link) => ({
+  text: `*${username}* recently watched:`,
   response_type: 'in_channel',
   attachments: [
     {
@@ -27,17 +27,20 @@ const buildSuccess = (poster, title_and_rating, watched_on, link) => ({
           value: title_and_rating,
           short: true,
         },
+
         {
           title: 'Reviewed On',
           value: watched_on,
           short: true,
         },
+
         {
           title: 'Link',
           value: `<${link}|View on Letterboxd...>`,
           short: false,
         },
       ],
+
       mrkdwn_in: ['text'],
     }
   ],
@@ -46,33 +49,25 @@ const buildSuccess = (poster, title_and_rating, watched_on, link) => ({
 const getRecentMovie = (username) => {
   const url = `https://letterboxd.com/${username}/rss/`;
 
-  request.get({ url, method: 'GET'})
+  return request.get({ url, method: 'GET' })
     .then((response) => {
-      if(!response) {
+      if (!response) {
         throw new NotFoundError("No response...");
       }
 
-      var title_and_rating;
-      var watched_on;
-      var link;
-      var poster;
+      return new Promise((resolve) => {
+        parse(response, {}, (err, result) => {
+          const previous_movie = result.rss.channel[0].item[0];
+          const poster_dom = new JSDOM(previous_movie.description[0]);
 
-      parse(response, {},function(err, result) {
-        var previous_movie = result.rss.channel[0].item[0];
-
-        title_and_rating = previous_movie.title[0];
-        watched_on       = previous_movie.pubDate[0];
-        link             = previous_movie.link[0];
-        var poster_dom       = new JSDOM(previous_movie.description[0]);
-        poster           = poster_dom.window.document.querySelector('img').src;
+          resolve({
+            title_and_rating: previous_movie.title[0],
+            watched_on: previous_movie.pubDate[0],
+            link: previous_movie.link[0],
+            poster: poster_dom.window.document.querySelector('img').src,
+          });
+        });
       });
-
-      return {
-        title_and_rating: title_and_rating,
-        watched_on: watched_on,
-        link: link,
-        poster: poster,
-      };
     });
 };
 
@@ -84,9 +79,9 @@ module.exports = (ctx, cb) => {
   }
 
   return getRecentMovie(username)
-    .then(({title_and_rating, watched_on, link, poster}) => {
-      const response = buildSuccess(poster, title_and_rating, watched_on, link);
+    .then(({ title_and_rating, watched_on, link, poster }) => {
+      const response = buildSuccess(username, poster, title_and_rating, watched_on, link);
       console.log(response);
       cb(null, response);
-    })
+    });
 };
