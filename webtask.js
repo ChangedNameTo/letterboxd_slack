@@ -15,7 +15,7 @@ const buildError = (text = 'test', color = 'danger', hasMarkDown = true) => ({
   mrkdwn_in: ['text'],
 });
 
-const buildSuccess = (username, poster, title_and_rating, watched_on, link, review) => ({
+const buildSuccess = (username, poster, title_and_rating, watched_on, link, review/*, add_to_watchlist*/) => ({
   text: `*${username}* recently watched:`,
   response_type: 'in_channel',
   attachments: [
@@ -41,10 +41,16 @@ const buildSuccess = (username, poster, title_and_rating, watched_on, link, revi
         },
 
         {
-          title: 'Link',
+          title: 'Link to Review',
           value: `<${link}|View on Letterboxd...>`,
           short: false,
         },
+
+        // {
+        //   title: 'Add to watchlist',
+        //   value: `<${add_to_watchlist}|Add...>`,
+        //   short: false,
+        // },
       ],
 
       mrkdwn_in: ['text'],
@@ -66,14 +72,16 @@ const getRecentMovie = (username) => {
           const previous_movie = result.rss.channel[0].item[0];
           const poster_dom     = new JSDOM(previous_movie.description[0]);
 
-          const regex = /(\w{3},\s\d{1,2}\s\w{3}\s\d{4})/;
+          const url_regex = /\/([\w-]+)\/$/;
+          const add_to_watchlist = "https://letterboxd.com/film" + previous_movie.link[0].match(url_regex)[0] + "add-to-watchlist/";
 
           resolve({
             title_and_rating : previous_movie.title[0],
-            watched_on       : previous_movie.pubDate[0].match(regex)[0],
+            watched_on       : previous_movie['letterboxd:watchedDate'][0],
             link             : previous_movie.link[0],
             poster           : poster_dom.window.document.querySelector('img').src,
             review           : poster_dom.window.document.querySelectorAll('p')['1'].textContent,
+            // add_to_watchlist : add_to_watchlist,
           });
         });
       });
@@ -88,8 +96,8 @@ module.exports = (ctx, cb) => {
   }
 
   return getRecentMovie(username)
-    .then(({ title_and_rating, watched_on, link, poster, review }) => {
-      const response = buildSuccess(username, poster, title_and_rating, watched_on, link, review);
+    .then(({ title_and_rating, watched_on, link, poster, review/*, add_to_watchlist*/ }) => {
+      const response = buildSuccess(username, poster, title_and_rating, watched_on, link, review/*, add_to_watchlist*/);
       cb(null, response);
     });
 };
